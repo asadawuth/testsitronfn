@@ -1,33 +1,40 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { observer } from "mobx-react-lite";
 import { authStore } from "../store/authStore";
+import { authApi } from "../api/authapi";
+import { loadGoogleScript } from "../api/oauthHelper";
+
+const roleAccounts = {
+  MANAGER: {
+    email: "taodewy@gmail.com",
+    password: "Asadawuth41.",
+  },
+  TEAMLEADER: {
+    email: "taodewy1@gmail.com",
+    password: "Itaosd41.",
+  },
+  FLOORSTAFF: {
+    email: "taodewy3@gmail.com",
+    password: "Itaosd41.",
+  },
+};
 
 const LoginPage = observer(() => {
   const nav = useNavigate();
+  const googleTokenClient = useRef<any>(null);
+  const roleRef = useRef("");
   const [role, setRole] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
-  const roleAccounts = {
-    MANAGER: {
-      email: "taodewy@gmail.com",
-      password: "Asadawuth41.",
-    },
-    TEAMLEADER: {
-      email: "taodewy1@gmail.com",
-      password: "Itaosd41.",
-    },
-    FLOORSTAFF: {
-      email: "taodewy3@gmail.com",
-      password: "Itaosd41.",
-    },
-  };
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedRole = e.target.value;
     setRole(selectedRole);
+    roleRef.current = selectedRole;
     const account = roleAccounts[selectedRole as keyof typeof roleAccounts];
     if (account) {
       setEmail(account.email);
@@ -46,6 +53,81 @@ const LoginPage = observer(() => {
     }
   };
 
+  useEffect(() => {
+    const setupGoogleLogin = async () => {
+      try {
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        await loadGoogleScript();
+
+        const google = (window as any).google;
+        if (!clientId || !google?.accounts?.oauth2) {
+          throw new Error("Google OAuth is not ready");
+        }
+
+        googleTokenClient.current = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: "openid email profile",
+          callback: handleGoogleSuccess,
+        });
+        setGoogleReady(true);
+      } catch (err) {
+        console.error(err);
+        setError("Cannot load Google login");
+      }
+    };
+
+    setupGoogleLogin();
+  }, []);
+
+  const handleGoogleLogin = () => {
+    setError("");
+    googleTokenClient.current?.requestAccessToken();
+  };
+
+  const handleGoogleSuccess = async (tokenResponse: any) => {
+    try {
+      setOauthLoading(true);
+
+      if (tokenResponse.error || !tokenResponse.access_token) {
+        throw new Error(tokenResponse.error || "Google login failed");
+      }
+
+      const profileRes = await fetch(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        {
+          headers: {
+            Authorization: `Bearer ${tokenResponse.access_token}`,
+          },
+        },
+      );
+
+      if (!profileRes.ok) {
+        throw new Error("Cannot get Google profile");
+      }
+
+      const profile = await profileRes.json();
+      const oauthData = {
+        provider_user_id: profile.sub,
+        provider_email: profile.email,
+        email: profile.email,
+        first_name: profile.given_name || "",
+        last_name: profile.family_name || "",
+        profile_picture: profile.picture || "",
+        access_token: tokenResponse.access_token,
+        role: roleRef.current,
+      };
+
+      const result = await authApi.oauthLogin("GOOGLE", oauthData);
+      authStore.setUser(result.user, result.accessToken);
+      nav("/settingslistmovie");
+    } catch (err) {
+      console.error(err);
+      setError("Google login failed");
+    } finally {
+      setOauthLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black flex items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 bg-linear-to-br from-black via-gray-900 to-red-950 opacity-90"></div>
@@ -58,6 +140,7 @@ const LoginPage = observer(() => {
           </h1>
           <p className="text-gray-300 mt-2">Manage your movie system</p>
         </div>
+
         <div className="mb-4">
           <label className="block text-gray-300 mb-2 text-sm">
             Select Role
@@ -75,6 +158,7 @@ const LoginPage = observer(() => {
             <option value="FLOORSTAFF">FLOOR STAFF</option>
           </select>
         </div>
+
         <div className="mb-4">
           <label className="block text-gray-300 mb-2 text-sm">Email</label>
           <input
@@ -84,6 +168,7 @@ const LoginPage = observer(() => {
             className="w-full p-3 rounded-lg bg-black/40 border border-gray-700 text-white outline-none"
           />
         </div>
+
         <div className="mb-4">
           <label className="block text-gray-300 mb-2 text-sm">Password</label>
           <input
@@ -93,6 +178,7 @@ const LoginPage = observer(() => {
             className="w-full p-3 rounded-lg bg-black/40 border border-gray-700 text-white outline-none"
           />
         </div>
+
         {error && (
           <div className="mb-4 text-red-400 text-sm text-center">{error}</div>
         )}
@@ -103,6 +189,26 @@ const LoginPage = observer(() => {
         >
           {authStore.loading ? "Logging in..." : "Login"}
         </button>
+
+        {/* Oauth */}
+        <div>
+          <div>
+            <button
+              onClick={handleGoogleLogin}
+              disabled={!googleReady || oauthLoading || !role}
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-100 text-black py-3 rounded-lg 
+          font-medium transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <img
+                src="https://www.google.com/favicon.ico"
+                className="w-5 h-5"
+                alt=""
+              />
+              {oauthLoading ? "Signing in..." : "Sign in with Google"}
+            </button>
+          </div>
+        </div>
+        {/* Oauth */}
         <div className="mt-6 text-center text-gray-400 text-sm">
           Movie Management System
         </div>

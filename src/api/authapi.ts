@@ -6,6 +6,14 @@ export const authApi = {
     return res.data;
   },
 
+  oauthLogin: async (provider: string, oauthData: any) => {
+    const res = await api.post("/users/oauth", {
+      provider,
+      ...oauthData,
+    });
+    return res.data;
+  },
+
   logout: async () => {
     return api.post("/users/logout");
   },

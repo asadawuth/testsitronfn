@@ -40,6 +40,14 @@ class AuthStore {
     this.token = token;
   }
 
+  setUser(user: User, token?: string) {
+    if (token) {
+      this.setToken(token);
+    }
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    this.user = user;
+  }
+
   async logout() {
     await authApi.logout();
     localStorage.removeItem(TOKEN_KEY);
