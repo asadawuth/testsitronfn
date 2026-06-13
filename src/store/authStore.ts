@@ -52,6 +52,7 @@ class AuthStore {
     await authApi.logout();
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem("refreshToken");
     this.token = null;
     this.user = null;
   }
@@ -60,6 +61,7 @@ class AuthStore {
     await authApi.logoutAll();
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem("refreshToken");
     this.token = null;
     this.user = null;
   }

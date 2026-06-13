@@ -87,6 +87,7 @@ const MoviePage = observer(() => {
       setOpenEditsAndDelete(false);
     } catch (err) {
       console.error("Delete movie error:", err);
+      throw err;
     }
   };
 

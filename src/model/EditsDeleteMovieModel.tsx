@@ -9,7 +9,26 @@ type Props = {
   onClose: () => void;
   movie: Movie | null;
   onUpdate?: () => void;
-  onDelete?: (id: number) => void;
+  onDelete?: (id: number) => void | Promise<void>;
+};
+
+const getDeleteErrorMessage = (err: any) => {
+  const status = err?.response?.status;
+  const message =
+    err?.response?.data?.message ||
+    err?.response?.data?.error ||
+    err?.message ||
+    "Unknown error";
+
+  if (status === 401) {
+    return "Delete failed: please login again.";
+  }
+
+  if (status === 403) {
+    return "Delete failed: only MANAGER can delete movies.";
+  }
+
+  return `Delete failed${status ? ` (${status})` : ""}: ${message}`;
 };
 
 export default function EditsDeleteMovieModel({
@@ -22,6 +41,7 @@ export default function EditsDeleteMovieModel({
   const [tab, setTab] = useState<"edit" | "delete">("edit");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [form, setForm] = useState({
     title: "",
     release_year: "",
@@ -39,6 +59,7 @@ export default function EditsDeleteMovieModel({
       });
 
       setImageFile(null);
+      setDeleteError("");
     }
   }, [movie]);
 
@@ -57,6 +78,22 @@ export default function EditsDeleteMovieModel({
       onClose();
     } catch (err) {
       console.error("Edit movie error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteMovie = async () => {
+    if (!movie || !onDelete) return;
+
+    try {
+      setLoading(true);
+      setDeleteError("");
+      await onDelete(movie.id);
+      onClose();
+    } catch (err) {
+      console.error("Delete movie error:", err);
+      setDeleteError(getDeleteErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -289,15 +326,18 @@ export default function EditsDeleteMovieModel({
                 </p>
               </div>
               <button
-                onClick={() => {
-                  onDelete?.(movie.id);
-                  onClose();
-                }}
-                className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+                onClick={handleDeleteMovie}
+                disabled={loading}
+                className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white font-bold flex items-center justify-center gap-2 transition cursor-pointer"
               >
                 <Trash2 size={18} />
-                Delete Movie
+                {loading ? "Deleting..." : "Delete Movie"}
               </button>
+              {deleteError && (
+                <div className="text-center text-sm text-red-300">
+                  {deleteError}
+                </div>
+              )}
             </div>
           )}
         </div>

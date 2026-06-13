@@ -23,18 +23,16 @@ const roleAccounts = {
 const LoginPage = observer(() => {
   const nav = useNavigate();
   const googleTokenClient = useRef<any>(null);
-  const roleRef = useRef("");
   const [role, setRole] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [oauthLoading, setOauthLoading] = useState(false);
-  const [googleReady, setGoogleReady] = useState(false);
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedRole = e.target.value;
     setRole(selectedRole);
-    roleRef.current = selectedRole;
+
     const account = roleAccounts[selectedRole as keyof typeof roleAccounts];
     if (account) {
       setEmail(account.email);
@@ -53,35 +51,43 @@ const LoginPage = observer(() => {
     }
   };
 
+  const setupGoogleLogin = async () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    await loadGoogleScript();
+
+    const google = (window as any).google;
+    if (!clientId || !google?.accounts?.oauth2) {
+      throw new Error("Google OAuth is not ready");
+    }
+
+    googleTokenClient.current = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: "openid email profile",
+      callback: handleGoogleSuccess,
+    });
+  };
+
   useEffect(() => {
-    const setupGoogleLogin = async () => {
-      try {
-        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-        await loadGoogleScript();
-
-        const google = (window as any).google;
-        if (!clientId || !google?.accounts?.oauth2) {
-          throw new Error("Google OAuth is not ready");
-        }
-
-        googleTokenClient.current = google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: "openid email profile",
-          callback: handleGoogleSuccess,
-        });
-        setGoogleReady(true);
-      } catch (err) {
-        console.error(err);
-        setError("Cannot load Google login");
-      }
-    };
-
-    setupGoogleLogin();
+    setupGoogleLogin().catch((err) => {
+      console.error(err);
+      setError("Cannot load Google login");
+    });
   }, []);
 
-  const handleGoogleLogin = () => {
-    setError("");
-    googleTokenClient.current?.requestAccessToken();
+  const handleGoogleLogin = async () => {
+    try {
+      setError("");
+
+      if (!googleTokenClient.current) {
+        await setupGoogleLogin();
+      }
+
+      googleTokenClient.current?.requestAccessToken();
+      // googleTokenClient.current?.requestAccessToken({ prompt: "" });
+    } catch (err) {
+      console.error(err);
+      setError("Cannot open Google login");
+    }
   };
 
   const handleGoogleSuccess = async (tokenResponse: any) => {
@@ -114,7 +120,6 @@ const LoginPage = observer(() => {
         last_name: profile.family_name || "",
         profile_picture: profile.picture || "",
         access_token: tokenResponse.access_token,
-        role: roleRef.current,
       };
 
       const result = await authApi.oauthLogin("GOOGLE", oauthData);
@@ -182,6 +187,7 @@ const LoginPage = observer(() => {
         {error && (
           <div className="mb-4 text-red-400 text-sm text-center">{error}</div>
         )}
+
         <button
           onClick={handleLogin}
           disabled={authStore.loading || !role}
@@ -190,25 +196,19 @@ const LoginPage = observer(() => {
           {authStore.loading ? "Logging in..." : "Login"}
         </button>
 
-        {/* Oauth */}
-        <div>
-          <div>
-            <button
-              onClick={handleGoogleLogin}
-              disabled={!googleReady || oauthLoading || !role}
-              className="mt-4 w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-100 text-black py-3 rounded-lg 
-          font-medium transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <img
-                src="https://www.google.com/favicon.ico"
-                className="w-5 h-5"
-                alt=""
-              />
-              {oauthLoading ? "Signing in..." : "Sign in with Google"}
-            </button>
-          </div>
-        </div>
-        {/* Oauth */}
+        <button
+          onClick={handleGoogleLogin}
+          disabled={oauthLoading}
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-100 text-black py-3 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <img
+            src="https://www.google.com/favicon.ico"
+            className="w-5 h-5"
+            alt=""
+          />
+          {oauthLoading ? "Signing in..." : "Continue with Google"}
+        </button>
+
         <div className="mt-6 text-center text-gray-400 text-sm">
           Movie Management System
         </div>
