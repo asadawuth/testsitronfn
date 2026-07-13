@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { observer } from "mobx-react-lite";
 import { authStore } from "../store/authStore";
 import { authApi } from "../api/authapi";
-import { loadGoogleScript } from "../api/oauthHelper";
+import { loadGoogleScript, loadFacebookScript } from "../api/oauthHelper";
 
 const roleAccounts = {
   MANAGER: {
@@ -67,11 +67,57 @@ const LoginPage = observer(() => {
     });
   };
 
+  const handleFacebookLogin = () => {
+    setError("");
+
+    const FB = (window as any).FB;
+
+    FB.login(
+      async (response: any) => {
+        if (!response.authResponse) return;
+
+        try {
+          setOauthLoading(true);
+
+          const accessToken = response.authResponse.accessToken;
+
+          const profileRes = await fetch(
+            `https://graph.facebook.com/me?fields=id,email,first_name,last_name,picture&access_token=${accessToken}`,
+          );
+
+          const profile = await profileRes.json();
+
+          const oauthData = {
+            provider_user_id: profile.id,
+            provider_email: profile.email,
+            email: profile.email,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            profile_picture: profile.picture?.data?.url,
+            access_token: accessToken,
+          };
+
+          const result = await authApi.oauthLogin("FACEBOOK", oauthData);
+
+          authStore.setUser(result.user, result.accessToken);
+
+          nav("/settingslistmovie");
+        } catch (err) {
+          console.error(err);
+          setError("Facebook login failed");
+        } finally {
+          setOauthLoading(false);
+        }
+      },
+      {
+        scope: "public_profile,email",
+      },
+    );
+  };
+
   useEffect(() => {
-    setupGoogleLogin().catch((err) => {
-      console.error(err);
-      setError("Cannot load Google login");
-    });
+    setupGoogleLogin().catch(console.error);
+    loadFacebookScript().catch(console.error);
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -208,7 +254,13 @@ const LoginPage = observer(() => {
           />
           {oauthLoading ? "Signing in..." : "Continue with Google"}
         </button>
-
+        <button
+          onClick={handleFacebookLogin}
+          disabled={oauthLoading}
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50 cursor-pointer"
+        >
+          Continue with Facebook
+        </button>
         <div className="mt-6 text-center text-gray-400 text-sm">
           Movie Management System
         </div>

@@ -36,3 +36,52 @@ export const loadGoogleScript = () =>
 
     document.body.appendChild(script);
   });
+
+export const loadFacebookScript = () =>
+  new Promise<void>((resolve, reject) => {
+    if ((window as any).FB) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src="https://connect.facebook.net/en_US/sdk.js"]',
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), {
+        once: true,
+      });
+
+      existingScript.addEventListener(
+        "error",
+        () => reject(new Error("Cannot load Facebook SDK")),
+        {
+          once: true,
+        },
+      );
+
+      return;
+    }
+
+    const script = document.createElement("script");
+
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => {
+      (window as any).FB.init({
+        appId: import.meta.env.VITE_FACEBOOK_CLIENT_ID,
+        cookie: true,
+        xfbml: false,
+        version: "v23.0",
+      });
+
+      resolve();
+    };
+
+    script.onerror = () => reject(new Error("Cannot load Facebook SDK"));
+
+    document.body.appendChild(script);
+  });
