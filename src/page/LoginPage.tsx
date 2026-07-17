@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { observer } from "mobx-react-lite";
 import { authStore } from "../store/authStore";
-import { authApi } from "../api/authapi";
 import { loadGoogleScript, loadFacebookScript } from "../api/oauthHelper";
 
 const roleAccounts = {
@@ -73,46 +72,49 @@ const LoginPage = observer(() => {
     const FB = (window as any).FB;
 
     FB.login(
-      async (response: any) => {
-        if (!response.authResponse) return;
-
-        try {
-          setOauthLoading(true);
-
-          const accessToken = response.authResponse.accessToken;
-
-          const profileRes = await fetch(
-            `https://graph.facebook.com/me?fields=id,email,first_name,last_name,picture&access_token=${accessToken}`,
-          );
-
-          const profile = await profileRes.json();
-
-          const oauthData = {
-            provider_user_id: profile.id,
-            provider_email: profile.email,
-            email: profile.email,
-            first_name: profile.first_name,
-            last_name: profile.last_name,
-            profile_picture: profile.picture?.data?.url,
-            access_token: accessToken,
-          };
-
-          const result = await authApi.oauthLogin("FACEBOOK", oauthData);
-
-          authStore.setUser(result.user, result.accessToken);
-
-          nav("/settingslistmovie");
-        } catch (err) {
-          console.error(err);
-          setError("Facebook login failed");
-        } finally {
-          setOauthLoading(false);
-        }
+      (response: any) => {
+        // ← ฟังก์ชันธรรมดา ไม่ใส่ async
+        processFacebookResponse(response); // เรียก async function แยกต่างหาก
       },
       {
         scope: "public_profile,email",
       },
     );
+  };
+
+  // แยก logic async ออกมาเป็นฟังก์ชันของตัวเอง
+  const processFacebookResponse = async (response: any) => {
+    if (!response.authResponse) return;
+
+    try {
+      setOauthLoading(true);
+
+      const accessToken = response.authResponse.accessToken;
+
+      const profileRes = await fetch(
+        `https://graph.facebook.com/me?fields=id,email,first_name,last_name,picture&access_token=${accessToken}`,
+      );
+
+      const profile = await profileRes.json();
+
+      const oauthData = {
+        provider_user_id: profile.id,
+        provider_email: profile.email,
+        email: profile.email,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        profile_picture: profile.picture?.data?.url,
+        access_token: accessToken,
+      };
+
+      await authStore.oauthLogin("FACEBOOK", oauthData);
+      nav("/settingslistmovie");
+    } catch (err) {
+      console.error(err);
+      setError("Facebook login failed");
+    } finally {
+      setOauthLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -168,8 +170,7 @@ const LoginPage = observer(() => {
         access_token: tokenResponse.access_token,
       };
 
-      const result = await authApi.oauthLogin("GOOGLE", oauthData);
-      authStore.setUser(result.user, result.accessToken);
+      await authStore.oauthLogin("GOOGLE", oauthData);
       nav("/settingslistmovie");
     } catch (err) {
       console.error(err);
