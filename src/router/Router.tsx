@@ -3,6 +3,7 @@ import LoginPage from "../page/LoginPage";
 import MoviePage from "../page/MoviePage";
 import PathNotFound from "../page/PathNotFound";
 import AdminStstem from "../page/AdminStstem";
+import GithubCallbackPage from "../page/GithubCallbackPage";
 import HistoryListMovie from "../page/HistoryListMovie";
 import MainLayout from "../conponent/layout/MainLayout";
 import { observer } from "mobx-react-lite";
@@ -25,6 +26,10 @@ const PublicRoute = observer(({ children }: { children: React.ReactNode }) => {
 });
 
 export const router = createBrowserRouter([
+  {
+    path: "/auth/github/callback",
+    element: <GithubCallbackPage />,
+  },
   {
     path: "/",
     element: <Navigate to="/settingslistmovie" replace />,

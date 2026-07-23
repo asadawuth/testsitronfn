@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { observer } from "mobx-react-lite";
 import { authStore } from "../store/authStore";
-import { loadGoogleScript, loadFacebookScript } from "../api/oauthHelper";
+import {
+  loadGoogleScript,
+  loadFacebookScript,
+  getGithubLoginUrl,
+} from "../api/oauthHelper";
 
 const roleAccounts = {
   MANAGER: {
@@ -180,6 +184,11 @@ const LoginPage = observer(() => {
     }
   };
 
+  const handleGithubLogin = () => {
+    console.log(import.meta.env.VITE_GITHUB_CLIENT_ID);
+    window.location.href = getGithubLoginUrl();
+  };
+
   return (
     <div className="min-h-screen bg-black flex items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 bg-linear-to-br from-black via-gray-900 to-red-950 opacity-90"></div>
@@ -261,6 +270,13 @@ const LoginPage = observer(() => {
           className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50 cursor-pointer"
         >
           Continue with Facebook
+        </button>
+        <button
+          onClick={handleGithubLogin}
+          disabled={oauthLoading}
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white py-3 rounded-lg font-medium transition disabled:opacity-50 cursor-pointer"
+        >
+          Continue with GitHub
         </button>
         <div className="mt-6 text-center text-gray-400 text-sm">
           Movie Management System
