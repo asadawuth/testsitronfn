@@ -5,9 +5,26 @@ import type { User, UserSystemItem } from "../types/auth";
 const TOKEN_KEY = "access_token";
 const USER_KEY = "user";
 
+const getStoredUser = (): User | null => {
+  const storedUser = localStorage.getItem(USER_KEY);
+
+  if (!storedUser || storedUser === "undefined") {
+    localStorage.removeItem(USER_KEY);
+    return null;
+  }
+
+  try {
+    return JSON.parse(storedUser) as User;
+  } catch {
+    // Do not let a malformed localStorage value prevent the app from starting.
+    localStorage.removeItem(USER_KEY);
+    return null;
+  }
+};
+
 class AuthStore {
   token: string | null = localStorage.getItem(TOKEN_KEY);
-  user: User | null = JSON.parse(localStorage.getItem(USER_KEY) || "null");
+  user: User | null = getStoredUser();
   users: UserSystemItem[] = [];
   loading = false;
   page = 1;
